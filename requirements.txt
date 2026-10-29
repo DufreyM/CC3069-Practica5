@@ -2,3 +2,4 @@
 numpy<2.4
 numba-cuda[cu12]
 pillow
+matplotlib

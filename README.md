@@ -11,8 +11,10 @@ replica el píxel de la orilla (clamp).
 | `generar_imagen.py` | Genera la imagen de entrada 8K en `data/` (sintética o a partir de una foto) |
 | `blur_secuencial.py` | Versión secuencial en CPU (referencia de tiempo) |
 | `blur_cuda.py` | Versión paralela en GPU con Numba CUDA; verifica el resultado contra la CPU |
+| `analisis.py` | Speedup, gráficas y comparación visual del antes/después |
 | `imagenes/` | Fotos originales para usar como entrada |
 | `diagramas/` | Diagramas de flujo en formato draw.io (`.drawio`) |
+| `resultados/` | Gráficas y tiempos medidos (sí se suben al repo) |
 | `requirements.txt` | Dependencias de Python |
 | `data/` | Imágenes y tiempos generados (no se sube al repo) |
 
@@ -26,6 +28,7 @@ python blur_secuencial.py             # imagen 8K completa, ~4 min
 python blur_secuencial.py --entrada data/gallina_8k.npy
 python blur_cuda.py --explorar-bloques   # 8K en GPU + comparación de tamaños de bloque
 python blur_cuda.py --entrada data/gallina_8k.npy
+python analisis.py                    # tablas y gráficas en resultados/
 ```
 
 Cada corrida guarda su resultado en `data/<imagen>_blur_cpu.npy` o `data/<imagen>_blur_cuda.npy` y sus tiempos en
