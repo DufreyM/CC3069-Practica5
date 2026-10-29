@@ -92,3 +92,134 @@ Usamos dos imágenes del mismo tamaño:
 2. **`gallina_8k`**: una foto real de [Unsplash](https://unsplash.com) (`imagenes/gallina.png`, 800 × 1200), ampliada a 4320 × 7680
    (vertical). Tiene la misma cantidad de píxeles y bytes que la principal. Sirve para comprobar que el tiempo no
    depende del contenido de la imagen.
+
+---
+
+## IV. Creación de la solución paralela usando CUDA
+
+**Archivo:** [`blur_cuda.py`](blur_cuda.py)
+
+![Diagrama de flujo CUDA](diagramas/blur_cuda.png)
+
+### Transferencia Host → GPU
+
+**¿Cómo están organizados y representados los datos de entrada de su algoritmo?**
+
+La imagen es un arreglo NumPy tridimensional `I[y, x, c]` de forma `(4320, 7680, 3)` y tipo `uint8`. Se guarda en
+memoria contigua en orden de filas (*row-major*, orden C): primero la fila 0 completa, luego la fila 1, y así
+sucesivamente. Dentro de cada fila, los píxeles van uno tras otro con sus 3 canales intercalados (R, G, B, R, G,
+B…). El valor `I[y, x, c]` está en el byte `(y · 7680 + x) · 3 + c`. Al copiarlo a la GPU con `cuda.to_device`,
+el `DeviceNDArray` mantiene la misma forma y la misma distribución en VRAM, así que el kernel lo indexa igual que
+en la CPU.
+
+**¿Cuánto tiempo tomó transferir los datos desde el Host hacia la GPU?**
+
+```python
+inicio = time.perf_counter()
+d_I = cuda.to_device(I)
+cuda.synchronize()
+t_h2d = time.perf_counter() - inicio
+```
+
+**13.31 ms** (mediana de 10 corridas) para los 94.92 MiB, es decir unos **7.5 GB/s**. En la primera corrida fueron
+13.51 ms. Antes de medir creamos el contexto CUDA con `cuda.get_current_device()`, para que su inicialización no se
+sumara a la transferencia.
+
+### Configuración de bloques y grid
+
+**Si configuran bloques de 256 hilos y necesitan procesar un arreglo de 1,000,000 de elementos, ¿cuántos bloques
+se requieren para cubrir todos los datos?**
+
+⌈1 000 000 / 256⌉ = ⌈3906.25⌉ = **3907 bloques**. Eso da 3907 × 256 = 1 000 192 hilos. Los 192 hilos que sobran
+en el último bloque deben descartarse con un `if (i < n)` dentro del kernel.
+
+**¿Qué consideraciones tomarán en cuenta para definir el tamaño y la configuración de la Grid de su algoritmo?**
+
+1. **Grid 2D, porque los datos son 2D.** Cada hilo corresponde a un píxel. `cuda.grid(2)` entrega `(x, y)` = (columna, fila).
+2. **Bloque de 16 × 16 = 256 hilos.** Es múltiplo de 32 (el tamaño de un *warp*) y está por debajo del máximo de
+   1024 hilos por bloque. Además, es lo bastante pequeño para que cada multiprocesador mantenga varios bloques
+   activos al mismo tiempo, lo que mejora la ocupación.
+3. **Cubrir toda la imagen redondeando hacia arriba:** grid = (⌈W / 16⌉, ⌈H / 16⌉) = (⌈7680 / 16⌉, ⌈4320 / 16⌉)
+   = **480 × 270 = 129 600 bloques**, es decir **33 177 600 hilos**, exactamente uno por píxel.
+4. **Protección de bordes en el kernel:** `if x < W and y < H`. En la imagen 8K los dos lados son múltiplos de 16,
+   pero con otros tamaños sí sobran hilos. En el recorte de prueba de 270 × 480 se lanzan 130 560 hilos para
+   129 600 píxeles.
+5. **Accesos a memoria agrupados (*coalesced*):** `x` (la columna) corresponde a la dimensión más rápida del bloque.
+   Así, los hilos consecutivos de un warp leen píxeles consecutivos de la misma fila, que están en direcciones de
+   memoria contiguas.
+
+Comprobamos el efecto del tamaño de bloque midiendo solo el kernel (`--explorar-bloques`):
+
+![Tiempo del kernel por tamaño de bloque](resultados/kernel_por_bloque.png)
+
+Todas las configuraciones quedan entre 3.8 y 4.5 ms. El kernel está limitado por el acceso a memoria, no por la
+cantidad de hilos por bloque, así que mientras la grid cubra la imagen el tamaño del bloque importa poco.
+
+### Kernel
+
+```python
+@cuda.jit
+def blur_kernel(I, R):
+    x, y = cuda.grid(2)  # índice global del hilo: x = columna, y = fila
+    H, W, C = I.shape
+    if x < W and y < H:  # los hilos sobrantes del último bloque no hacen nada
+        for c in range(C):
+            suma = 0
+            for dy in range(-1, 2):
+                yy = min(max(y + dy, 0), H - 1)
+                for dx in range(-1, 2):
+                    xx = min(max(x + dx, 0), W - 1)
+                    suma += I[yy, xx, c]
+            R[y, x, c] = (suma + 4) // 9  # suma / 9 redondeado, igual que en la CPU
+```
+
+**¿Qué operación(es)/función(es) del algoritmo seleccionado se ejecutarán dentro del kernel?**
+
+El cuerpo de los dos ciclos externos de la versión secuencial (`for y`, `for x`). Esos dos ciclos desaparecen,
+porque cada hilo ya representa un `(y, x)`. Dentro del kernel quedan:
+- el ciclo de canales `c`
+- la ventana 3×3 (`dy`, `dx`)
+- el *clamp* de los índices
+- la suma de los 9 valores
+- la división redondeada entre 9
+- la escritura en `R`
+
+**¿Qué resultado generará cada hilo al ejecutar el kernel?**
+
+Cada hilo calcula **un píxel completo de la imagen de salida**: los 3 valores `R[y, x, 0]`, `R[y, x, 1]` y
+`R[y, x, 2]`, que son el promedio redondeado de su ventana 3×3 en cada canal. Para eso lee 27 valores de `I` (9
+vecinos × 3 canales) y escribe 3 en `R`. Ningún hilo escribe en la posición de otro, así que no hacen falta
+operaciones atómicas ni barreras de sincronización.
+
+### Transferencia GPU → Host
+
+**¿Qué instrucción o método de CUDA Python permite copiar los resultados desde la GPU hacia el Host?**
+
+El método **`copy_to_host()`** del arreglo en el dispositivo: `R = d_R.copy_to_host()`. También acepta un arreglo de
+destino ya reservado, por ejemplo `d_R.copy_to_host(destino)`.
+
+**¿Cuánto tiempo tomó transferir los resultados desde la GPU hacia el Host?**
+
+```python
+cuda.synchronize()                 # el kernel ya terminó
+inicio = time.perf_counter()
+R = d_R.copy_to_host()
+t_d2h = time.perf_counter() - inicio
+```
+
+**28.18 ms** (mediana de 10 corridas). Es más del doble que la copia de ida, aunque se mueve la misma cantidad de
+datos. Lo investigamos con [`experimento_memoria.py`](experimento_memoria.py):
+
+| Variante | Tiempo |
+|---|---|
+| `copy_to_host()` a un arreglo **nuevo** (lo que mide `blur_cuda.py`) | 33.76 ms |
+| `copy_to_host(destino)` a un arreglo **ya reservado** | 10.06 ms |
+| `copy_to_host(fijada)` a memoria **pinned** | 7.59 ms |
+| Host → GPU desde memoria normal (pageable) | 13.39 ms |
+| Host → GPU desde memoria pinned | 11.28 ms |
+
+La diferencia viene de que `copy_to_host()` sin argumento reserva un arreglo nuevo de 95 MB en cada llamada. La
+primera vez que se escribe en esas páginas de memoria, el sistema operativo tiene que asignarlas, y ese costo de
+unos 24 ms se suma a la copia. Con un arreglo reutilizado, la copia de regreso baja a unos 10 ms, comparable a la de
+ida. Con memoria *pinned*, que el driver puede transferir por DMA sin una copia intermedia, ambas direcciones son
+más rápidas.
