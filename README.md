@@ -39,3 +39,9 @@ Para exportar de nuevo a PNG con draw.io Desktop:
 Fuente editable: [`diagramas/blur_secuencial.drawio`](diagramas/blur_secuencial.drawio)
 
 ![Diagrama de flujo secuencial](diagramas/blur_secuencial.png)
+
+### Flujo con CUDA: Host ↔ Device (sección IV)
+
+Fuente editable: [`diagramas/blur_cuda.drawio`](diagramas/blur_cuda.drawio)
+
+![Diagrama de flujo CUDA](diagramas/blur_cuda.png)
