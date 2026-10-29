@@ -9,6 +9,7 @@ replica el píxel de la orilla (clamp).
 | Carpeta / archivo | Contenido |
 |---|---|
 | `generar_imagen.py` | Genera la imagen de entrada 8K en `data/` (sintética o a partir de una foto) |
+| `imagenes/` | Fotos originales para usar como entrada |
 | `diagramas/` | Diagramas de flujo en formato draw.io (`.drawio`) |
 | `requirements.txt` | Dependencias de Python |
 | `data/` | Imágenes y tiempos generados (no se sube al repo) |
@@ -17,6 +18,7 @@ replica el píxel de la orilla (clamp).
 
 ```powershell
 python generar_imagen.py              # imagen sintética 8K en data/imagen_8k.npy
+python generar_imagen.py --desde imagenes/gallina.png --salida data/gallina_8k.npy
 ```
 
 ### Datos de entrada
@@ -68,3 +70,7 @@ Fuente editable: [`diagramas/blur_secuencial.drawio`](diagramas/blur_secuencial.
 Fuente editable: [`diagramas/blur_cuda.drawio`](diagramas/blur_cuda.drawio)
 
 ![Diagrama de flujo CUDA](diagramas/blur_cuda.png)
+
+## Imágenes
+
+- `imagenes/gallina.png`: foto de [Unsplash](https://unsplash.com) (800 × 1200, vertical), ampliada 6.4 veces a 4320 × 7680.
