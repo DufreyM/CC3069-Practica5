@@ -1,0 +1,15 @@
+# Entornos virtuales
+.venv/
+venv/
+
+# Python
+__pycache__/
+*.pyc
+
+# Imágenes generadas (una 8K RGB pesa ~100 MB, no se suben al repo)
+data/
+*.npy
+
+# Respaldos de draw.io
+*.drawio.bkp
+.$*.drawio

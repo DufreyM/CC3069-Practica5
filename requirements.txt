@@ -1,0 +1,4 @@
+# numba-cuda aún usa np.row_stack (eliminado en NumPy 2.4+), por eso se fija numpy<2.4
+numpy<2.4
+numba-cuda[cu12]
+pillow
