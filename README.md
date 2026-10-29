@@ -28,4 +28,14 @@ python -c "from numba import cuda; cuda.detect()"
 
 Se abren con [app.diagrams.net](https://app.diagrams.net) o con la extensión *Draw.io Integration* de VS Code.
 
-- `diagramas/blur_secuencial.drawio`: algoritmo secuencial en CPU (sección III).
+Para exportar de nuevo a PNG con draw.io Desktop:
+
+```powershell
+& "$env:LOCALAPPDATA\Programs\draw.io\draw.io.exe" --export --format png --scale 2 --border 20 --output diagramas/blur_secuencial.png diagramas/blur_secuencial.drawio
+```
+
+### Algoritmo secuencial en CPU (sección III)
+
+Fuente editable: [`diagramas/blur_secuencial.drawio`](diagramas/blur_secuencial.drawio)
+
+![Diagrama de flujo secuencial](diagramas/blur_secuencial.png)

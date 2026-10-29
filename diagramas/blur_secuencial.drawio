@@ -74,7 +74,7 @@
           <mxGeometry x="405" y="1180" width="130" height="40" as="geometry"/>
         </mxCell>
         <mxCell id="nota" value="&lt;b&gt;Notas&lt;/b&gt;&lt;br&gt;&lt;br&gt;• Cada píxel nuevo es el promedio de 9 valores:&lt;br&gt;&amp;nbsp;&amp;nbsp;él mismo y sus 8 vecinos (ventana 3×3).&lt;br&gt;&lt;br&gt;• &lt;b&gt;Bordes:&lt;/b&gt; se replica el píxel de la orilla&lt;br&gt;&amp;nbsp;&amp;nbsp;(clamp de yy y xx), así siempre se divide entre 9.&lt;br&gt;&lt;br&gt;• Se lee de I y se escribe en R; nunca se&lt;br&gt;&amp;nbsp;&amp;nbsp;sobrescribe la imagen de entrada.&lt;br&gt;&lt;br&gt;• Imagen 8K: H = 4320, W = 7680&lt;br&gt;&amp;nbsp;&amp;nbsp;→ 33 177 600 píxeles × 3 canales × 9 lecturas&lt;br&gt;&amp;nbsp;&amp;nbsp;≈ 896 millones de sumas." style="shape=note;whiteSpace=wrap;html=1;size=16;align=left;verticalAlign=top;spacingLeft=10;spacingTop=6;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;" vertex="1" parent="1">
-          <mxGeometry x="1150" y="100" width="380" height="300" as="geometry"/>
+          <mxGeometry x="1150" y="100" width="380" height="230" as="geometry"/>
         </mxCell>
         <mxCell id="e0" value="" style="edgeStyle=none;rounded=0;html=1;endArrow=block;endFill=1;fontStyle=1;labelBackgroundColor=#ffffff;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="ini" target="leer">
           <mxGeometry relative="1" as="geometry">
