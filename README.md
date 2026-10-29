@@ -8,8 +8,28 @@ replica el píxel de la orilla (clamp).
 
 | Carpeta / archivo | Contenido |
 |---|---|
+| `generar_imagen.py` | Genera la imagen de entrada 8K en `data/` (sintética o a partir de una foto) |
 | `diagramas/` | Diagramas de flujo en formato draw.io (`.drawio`) |
 | `requirements.txt` | Dependencias de Python |
+| `data/` | Imágenes y tiempos generados (no se sube al repo) |
+
+## Cómo correr
+
+```powershell
+python generar_imagen.py              # imagen sintética 8K en data/imagen_8k.npy
+```
+
+### Datos de entrada
+
+| | |
+|---|---|
+| Dimensiones | 4320 × 7680 × 3 (alto × ancho × canales RGB) |
+| Cantidad de datos | 33 177 600 píxeles = 99 532 800 valores `uint8` |
+| Tamaño en memoria | 99 532 800 bytes ≈ 94.92 MiB |
+
+La imagen por defecto es sintética, con aspecto de foto satelital: ruido fractal con semilla fija, así todos generan la misma imagen.
+Con `--desde` se puede usar una foto: se recorta al centro a 16:9 (o 9:16 si es vertical) y se lleva a 8K.
+Una foto vertical queda en 7680 × 4320, con la misma cantidad de píxeles y bytes.
 
 ## Entorno
 
