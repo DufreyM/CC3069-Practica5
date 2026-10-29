@@ -28,6 +28,9 @@ python -c "from numba import cuda; cuda.detect()"
 
 Se abren con [app.diagrams.net](https://app.diagrams.net) o con la extensión *Draw.io Integration* de VS Code.
 
+Los `.drawio` se generan con `python diagramas/gen_diagramas.py` (requiere `pillow` solo para la opción `--preview`).
+Si editan un diagrama a mano en draw.io, ya no lo regeneren con el script o se perderán los cambios.
+
 Para exportar de nuevo a PNG con draw.io Desktop:
 
 ```powershell
