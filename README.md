@@ -9,6 +9,7 @@ replica el píxel de la orilla (clamp).
 | Carpeta / archivo | Contenido |
 |---|---|
 | `generar_imagen.py` | Genera la imagen de entrada 8K en `data/` (sintética o a partir de una foto) |
+| `blur_secuencial.py` | Versión secuencial en CPU (referencia de tiempo) |
 | `imagenes/` | Fotos originales para usar como entrada |
 | `diagramas/` | Diagramas de flujo en formato draw.io (`.drawio`) |
 | `requirements.txt` | Dependencias de Python |
@@ -19,7 +20,12 @@ replica el píxel de la orilla (clamp).
 ```powershell
 python generar_imagen.py              # imagen sintética 8K en data/imagen_8k.npy
 python generar_imagen.py --desde imagenes/gallina.png --salida data/gallina_8k.npy
+python blur_secuencial.py --prueba    # recorte de 270 × 480, menos de 1 s
+python blur_secuencial.py             # imagen 8K completa, ~4 min
+python blur_secuencial.py --entrada data/gallina_8k.npy
 ```
+
+Cada corrida guarda su resultado en `data/<imagen>_blur_cpu.npy` y su tiempo en `data/tiempos.json`, agrupado por imagen.
 
 ### Datos de entrada
 
