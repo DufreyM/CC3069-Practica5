@@ -1,0 +1,9 @@
+{
+  "h2d_pageable_ms": 13.387599999987287,
+  "h2d_pinned_ms": 11.275150000074063,
+  "d2h_arreglo_nuevo_ms": 33.75574999972741,
+  "d2h_arreglo_reusado_ms": 10.06280000001425,
+  "d2h_pinned_ms": 7.590050000089832,
+  "kernel_d_r_reusado_ms": 3.235549999772047,
+  "kernel_d_r_nuevo_ms": 7.074749999901542
+}
