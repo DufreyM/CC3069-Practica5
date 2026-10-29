@@ -4,10 +4,15 @@ Algoritmo elegido: **Filtro de desenfoque (blur) 3×3** sobre una imagen 8K (768
 Cada píxel del resultado es el promedio de sí mismo y sus 8 vecinos inmediatos; en los bordes se
 replica el píxel de la orilla (clamp).
 
+**Resultado:** en una imagen 8K, la versión CUDA tarda 48.9 ms, incluyendo las copias de ida y vuelta. La versión secuencial en
+Python tarda 249.5 s. Es un speedup de **5 103×**, y el resultado es idéntico bit a bit. El análisis completo y las
+respuestas de la práctica están en [INFORME.md](INFORME.md).
+
 ## Estructura
 
 | Carpeta / archivo | Contenido |
 |---|---|
+| `INFORME.md` | Informe con las respuestas de la práctica y el análisis de resultados |
 | `generar_imagen.py` | Genera la imagen de entrada 8K en `data/` (sintética o a partir de una foto) |
 | `blur_secuencial.py` | Versión secuencial en CPU (referencia de tiempo) |
 | `blur_cuda.py` | Versión paralela en GPU con Numba CUDA; verifica el resultado contra la CPU |
@@ -48,6 +53,15 @@ correr primero `blur_secuencial.py` con la misma imagen.
 La imagen por defecto es sintética, con aspecto de foto satelital: ruido fractal con semilla fija, así todos generan la misma imagen.
 Con `--desde` se puede usar una foto: se recorta al centro a 16:9 (o 9:16 si es vertical) y se lleva a 8K.
 Una foto vertical queda en 7680 × 4320, con la misma cantidad de píxeles y bytes.
+
+## Resultados
+
+| Imagen | t_CPU | t_CUDA total | Speedup |
+|---|---|---|---|
+| `imagen_8k` (sintética) | 249.50 s | 48.90 ms | 5 103× |
+| `gallina_8k` (foto) | 235.16 s | 49.88 ms | 4 715× |
+
+![CPU vs CUDA](resultados/tiempos_cpu_vs_cuda.png)
 
 ## Entorno
 

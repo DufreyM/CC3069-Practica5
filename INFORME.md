@@ -223,3 +223,129 @@ primera vez que se escribe en esas páginas de memoria, el sistema operativo tie
 unos 24 ms se suma a la copia. Con un arreglo reutilizado, la copia de regreso baja a unos 10 ms, comparable a la de
 ida. Con memoria *pinned*, que el driver puede transferir por DMA sin una copia intermedia, ambas direcciones son
 más rápidas.
+
+---
+
+## VI. Discusión de resultados y conclusiones
+
+### Resultados
+
+Para las fases CUDA se reporta la mediana de 10 corridas, después de una primera corrida que incluye la
+compilación JIT del kernel (ver abajo). El tiempo de CPU es una sola corrida, porque cada una tarda unos 4 minutos.
+
+| Imagen | t_CPU | t_H2D | t_kernel | t_D2H | **t_CUDA total** | **Speedup** | ¿Resultado idéntico? |
+|---|---|---|---|---|---|---|---|
+| `imagen_8k` (sintética) | 249.50 s | 13.31 ms | 6.71 ms | 28.18 ms | **48.90 ms** | **5 103×** | Sí, bit a bit |
+| `gallina_8k` (foto) | 235.16 s | 13.51 ms | 7.42 ms | 28.52 ms | **49.88 ms** | **4 715×** | Sí, bit a bit |
+
+El total es la mediana de los totales de cada corrida, por eso puede diferir un poco de la suma de las medianas de
+cada fase.
+
+![CPU vs CUDA](resultados/tiempos_cpu_vs_cuda.png)
+
+### ¿Cuál fue la aceleración obtenida?
+
+Speedup = t_CPU / t_CUDA, con t_CUDA = t_H2D + t_kernel + t_D2H medido en cada corrida. Como t_CUDA usamos la
+mediana de esas 10 sumas.
+
+Imagen principal (`imagen_8k`):
+
+$$\text{Speedup} = \frac{t_{CPU}}{t_{CUDA}} = \frac{249.50\ \text{s}}{0.04890\ \text{s}} \approx \mathbf{5\,103\times}$$
+
+Foto (`gallina_8k`):
+
+$$\text{Speedup} = \frac{235.16\ \text{s}}{0.04988\ \text{s}} \approx \mathbf{4\,715\times}$$
+
+Si en lugar de eso se suman las medianas de cada fase, se obtiene 13.31 + 6.71 + 28.18 = 48.20 ms, es decir
+249.50 / 0.04820 ≈ 5 176×. La diferencia no cambia la conclusión.
+
+**Sí, la implementación paralela mejoró el rendimiento de forma muy marcada.** Un filtro que en CPU tarda más de 4
+minutos se completa en menos de 50 ms en la GPU, incluyendo las dos transferencias, y el resultado es idéntico píxel
+por píxel.
+
+Para interpretar bien estas cifras:
+- **No son solo hardware.** El speedup compara Python interpretado con código compilado y paralelo. Gran parte de
+  la diferencia viene de que el intérprete de Python ejecuta cada una de las ~896 millones de sumas por separado. La
+  otra parte viene de tener 33 millones de hilos en lugar de uno. Una versión en C secuencial sería mucho más rápida
+  que la de Python, y el speedup frente a ella sería menor.
+- **Las transferencias dominan.** De los 48.9 ms de CUDA, solo **6.7 ms (14 %) son cálculo**. El 86 % restante se va
+  en mover los datos entre la RAM y la VRAM, como advierte el enunciado. Contando solo el kernel, el speedup sería
+  de unos **37 000×**.
+
+  ![Desglose CUDA](resultados/desglose_cuda.png)
+
+  El blur es un cálculo ligero (9 sumas por valor) sobre muchos datos, así que tiene poca intensidad aritmética. Si
+  la imagen se usara una sola vez y el cálculo fuera aún más simple, la transferencia podría anular la ventaja. La
+  GPU gana claramente cuando los datos se quedan en VRAM y se les aplican varias operaciones seguidas.
+- **La primera corrida es mucho más lenta: 519.6 ms.** Su kernel tardó 477 ms porque Numba compila el kernel en
+  la primera llamada (JIT). Si se mide solo una corrida en frío, el speedup cae a 249.50 / 0.5196 ≈ **480×**. Para
+  un programa que procesa una sola imagen y termina, ese es el costo real. En un flujo que procesa muchas imágenes,
+  la compilación se paga una sola vez.
+- **El contenido de la imagen no influye.** Las dos imágenes tienen la misma cantidad de datos y dan tiempos de GPU
+  prácticamente iguales (48.9 contra 49.9 ms). La diferencia de unos 6 % en la CPU (249.5 contra 235.2 s) se
+  explica por la variación normal del procesador entre corridas largas (frecuencia turbo y temperatura) y por la
+  actividad de fondo del sistema. El algoritmo hace exactamente las mismas operaciones con cualquier imagen.
+- **Cómo mejorarlo:** reservar la memoria del resultado una sola vez y usar memoria *pinned* reduciría el tiempo
+  total de unos 49 ms a unos 22 ms (11.3 + 3.2 + 7.6 ms en el experimento). Eso daría un speedup cercano a
+  **11 000×**. Otra opción es usar memoria compartida (*shared memory*) para que cada bloque cargue su región de la
+  imagen una sola vez, en lugar de que cada píxel se lea hasta 9 veces desde la memoria global.
+
+![Comparación visual](resultados/comparacion_imagen_8k.png)
+
+En la imagen sintética, el filtro suaviza el ruido píxel a píxel y difumina la orilla entre el agua y la costa.
+
+En la foto de la gallina, la figura muestra la imagen completa antes y después, y un acercamiento de 256 × 256 px a
+su ojo y su pico. La foto original medía 800 × 1200 y se amplió 6.4 veces, así que ya era muy suave: un desenfoque de
+3×3 sobre 8K cambia como máximo 3 niveles (de 255) en esa zona y casi no se nota a simple vista. El mapa de
+diferencias muestra que el filtro sí actuó, sobre todo en los contornos del ojo, las fosas nasales y el pico. Con una
+foto que ya fuera 8K de origen, el efecto se vería más, como pasa en la imagen sintética.
+
+![Comparación visual de la foto](resultados/comparacion_gallina_8k.png)
+
+### ¿Cuál fue la principal dificultad que encontraron al transformar el algoritmo secuencial en una implementación paralela utilizando CUDA? Expliquen cómo lograron resolverla.
+
+La principal dificultad fue **medir los tiempos de forma correcta**. La primera medición del kernel dio 477 ms,
+70 veces más que las siguientes, y la copia de regreso tardaba el doble que la de ida. Esto se debía a tres causas:
+
+1. **Ejecución asíncrona.** El lanzamiento de un kernel regresa de inmediato, antes de que la GPU termine. Sin
+   `cuda.synchronize()`, el cronómetro mide solo el lanzamiento. Lo resolvimos sincronizando después de cada fase,
+   antes de detener el cronómetro.
+2. **Compilación JIT y creación del contexto.** Numba compila el kernel en su primera llamada, y el contexto CUDA
+   se crea la primera vez que se usa la GPU. Lo resolvimos creando el contexto antes de medir y reportando la
+   primera corrida por separado. Como resultado oficial usamos la mediana de 10 corridas, que además es menos
+   sensible a valores atípicos que el promedio.
+3. **El costo oculto de la memoria nueva.** `copy_to_host()` y `device_array_like()` reservan memoria nueva en
+   cada llamada, y la primera vez que se usa esa memoria es más lenta. Lo diagnosticamos con un experimento
+   separado ([`experimento_memoria.py`](experimento_memoria.py)) y lo documentamos como una optimización posible.
+
+Una segunda dificultad fue **garantizar que la GPU calcule exactamente lo mismo que la CPU**, para poder verificar
+el resultado sin depender de la vista. Usamos el mismo *clamp* de bordes y el mismo redondeo entero `(suma + 4) // 9`
+en las dos versiones, y comparamos las imágenes completas con `np.array_equal`. Las dos imágenes resultaron
+idénticas bit a bit.
+
+Por último, en la preparación del entorno, `numba-cuda` era incompatible con NumPy 2.5 (`np.row_stack` eliminado).
+Lo resolvimos fijando `numpy<2.4`.
+
+---
+
+## Cómo reproducir
+
+```powershell
+pip install -r requirements.txt
+python generar_imagen.py                                  # data/imagen_8k.npy
+python blur_secuencial.py                                 # ~4 min, data/imagen_8k_blur_cpu.npy
+python blur_cuda.py --explorar-bloques                    # data/imagen_8k_blur_cuda.npy + verificación
+python generar_imagen.py --desde imagenes/gallina.png --salida data/gallina_8k.npy
+python blur_secuencial.py --entrada data/gallina_8k.npy
+python blur_cuda.py --entrada data/gallina_8k.npy
+python experimento_memoria.py
+python analisis.py                                        # tablas y gráficas en resultados/
+```
+
+## Referencias
+
+- Documentación de Numba CUDA: <https://nvidia.github.io/numba-cuda/>. Kernels, `cuda.grid`, `to_device`,
+  `copy_to_host`, `pinned_array`.
+- NVIDIA, *CUDA C++ Best Practices Guide*: memoria pinned, accesos *coalesced* y ocupación. <https://docs.nvidia.com/cuda/cuda-c-best-practices-guide/>
+- Foto de prueba: Unsplash, archivo `photo-1792976724194-cc55b36a5219`, bajo la [Licencia de Unsplash](https://unsplash.com/license).
+- Las implementaciones secuencial y CUDA son propias; no se basaron en código existente.
